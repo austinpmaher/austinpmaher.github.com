@@ -1,4 +1,4 @@
-source:      ./_source
+source:      .
 destination: ./_site
 plugins:     ./_plugins
 layouts:     ./_layouts
@@ -7,7 +7,7 @@ exclude:     []
 keep_files:  ['.git','.svn']
 timezone:    America/New_York
 
-future:      trues
+future:      true
 show_drafts: nil
 limit_posts: 0
 pygments:    true
