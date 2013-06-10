@@ -1,0 +1,733 @@
+<html>
+<head>
+<title>Flexible Email Messaging with BEA WebLogic Campaign Manager</title>
+<meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1">
+<link 	rel="STYLESHEET" 
+	type="text/css" 
+	href="http://www.w3.org/StyleSheets/Core/Steely">
+
+</head>
+
+<body bgcolor="#FFFFFF">
+<h3>Flexible Email Messaging with BEA Campaign Manager for WebLogic</h3>
+<p>Austin P. Maher<br>
+  BEA RTP Accelerated Development Center<br>
+  23 July 2001</p>
+<h4>Introduction</h4>
+<p>The BEA Campaign Manager for WebLogic provides a foundation server environment 
+  for delivering personalized marketing campaigns via the web, email and wireless. 
+  Among it's features, Campaign Manager has the ability to generate and send email 
+  messages to campaign participants. Although the steps required to send email 
+  as part of a site visit or bulk mail campaign are well documented, Campaign 
+  Manager can also generate and send mail messages that are not triggered by a 
+  web-site visit. E-mail actions can be triggered from &quot;non-events&quot;. 
+  For example, a reminder message can be sent to all campaign participants who 
+  haven't visited the site in the past seven days. This article describes a technique 
+  for combining periodic tasks and the Campaign Manager event system to provide 
+  commerce business engineers increased flexibility when defining campaign scenario 
+  actions for email messaging.</p>
+<h4>Periodic Tasks</h4>
+<p>To send email that is not triggered by a campaign event from a participant 
+  visit, an asynchronous process is required that periodically wakes up and determines 
+  if mail should be sent. The WebLogic application server Time Services provides 
+  the framework necessary to implement asynchronous services. </p>
+<p>The WebLogic Time Services provides two interfaces for building periodic tasks: 
+  <code>weblogic.time.common.Triggerable</code> and <code>weblogic.time.common.Schedulable</code>.</p>
+<p>Periodic tasks must be registered with Time Services. The easiest way to do 
+  that is to create a startup class. Startup classes implement the <code>weblogic.common.T3StartupDef</code> 
+  interface. The startup class will also need to be declared in the WebLogic admin 
+  console for the class to be properly invoked.</p>
+<p>A minimal solution would be to write a single class that implements <code>Triggerable</code>, 
+  <code>Schedulable</code> and <code>T3StartupDef</code>. Each time the instance 
+  wakes up, it executes the appropriate query and the uses the Campaign Manager 
+  <code>MailService</code> to generate and send email messages. Although this 
+  solution may be minimally sufficient, it's behavior is dictated by hard-coded 
+  values. In addition, if other periodic tasks need to be generated, the existing 
+  class would need to be extended or duplicated.</p>
+<p>A more flexible solution would be to take advantage of the Campaign Manager 
+  event system to throw generic &quot;tick events&quot; at regular time periods. 
+  Services that want to wake up periodically become Tick listeners. If additional 
+  periodic tasks are required, define additional event listeners. The ticking 
+  process remains unaware of how many handlers are listening, or how frequently 
+  they run. </p>
+<p>The sample scheduling solution involves three classes: a <code>TickManager</code>, 
+  a <code>TickGenerator</code> and a <code>Tick</code> event class. The <code>TickManager</code> 
+  registers <code>TickGenerator</code>s with the WebLogic Server Time Services 
+  during server startup. Each <code>TickGenerator</code> sporadically wakes up 
+  and generates a tick event. Here's the <code>TickManager</code> startup class 
+  that registers a <code>TickGenerator</code> with the Time Services.</p>
+<p><b>TickManager.java</b></p>
+<pre><code>
+package com.bea.adc.scheduler;
+
+import java.util.Hashtable;
+import weblogic.common.*;
+import weblogic.time.common.Schedulable;
+import weblogic.time.common.ScheduledTriggerDef;
+import weblogic.time.common.Triggerable;
+import weblogic.time.common.TimeTriggerException;
+
+/**
+ * TickManager
+ * &lt;p&gt;
+ * The TickManager is a startup class that registers TickGenerators
+ * with various tick intervals.
+ */
+public class TickManager
+    implements T3StartupDef
+{
+    private T3ServicesDef _services;
+
+    public static long ONE_DAY = 24 * 60 * 60 * 1000;
+
+    public TickManager()
+        throws TimeTriggerException
+    {
+        register();
+    }
+
+    /**
+     * register the TickGenerators.
+     * &lt;p&gt;
+     * At this time, we register an hourly tick generator.
+     * In the future, register should be driven by parameters passed
+     * in to startup().
+     */
+    public void register() {
+        try {
+            TickGenerator hourlyTicking = new TickGenerator(ONE_HOUR);
+            ScheduledTriggerDef hourlyDef = T3Services.getT3Services()
+                .time()
+                .getScheduledTrigger(hourlyTicking, hourlyTicking);
+            hourlyDef.schedule();
+        }
+        catch (TimeTriggerException e) {
+            e.printStackTrace();
+        }
+        catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    public void setServices(T3ServicesDef services) {
+        _services = services;
+    }
+
+    public String startup(String name, Hashtable ht) {
+        // future: use parameters for configuration
+        return "TickManager reporting for duty";
+    }
+}
+</code></pre>
+<p> A <code>TickGenerator</code> emits a single tick event each time it awakes. 
+</p>
+<p><b>TickGenerator.java</b></p>
+
+<pre><code>
+package com.bea.adc.scheduler;
+
+import weblogic.time.common.Schedulable;
+import weblogic.time.common.ScheduledTriggerDef;
+import weblogic.time.common.Triggerable;
+import weblogic.time.common.TimeTriggerException;
+
+/**
+ * TickGenerator
+ * &lt;p&gt;
+ * A TickGenerator periodically wakes up and issues a Tick Event
+ * A more complete TickGenerator would include information in the
+ * Tick about the Tick frequency.
+ */
+public class TickGenerator implements Triggerable, Schedulable {
+
+    private long _tickInterval;
+
+    public TickGenerator(long tickInterval) {
+        _tickInterval = tickInterval;
+    }
+
+    public void trigger(Schedulable notUsed) {
+        try {
+            (new Tick()).issue();
+        }
+        catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    public long schedule(long theTime) {
+        return theTime + _tickInterval;
+    }
+}
+</code></pre>
+<p> The <code>Tick</code> class implements the periodic event that gets fired 
+  into the Campaign Manager event system.</p>
+<p><b>Tick.java</b></p>
+<pre><code>
+package com.bea.adc.scheduler;
+
+import java.rmi.RemoteException;
+import javax.rmi.PortableRemoteObject;
+import javax.naming.InitialContext;
+import javax.naming.NamingException;
+import javax.ejb.CreateException;
+import com.bea.commerce.platform.events.Event;
+import com.bea.commerce.platform.events.EventService;
+import com.bea.commerce.platform.events.EventServiceHome;
+
+/**
+ * Tick
+ * &lt;p&gt;
+ * Tick is a simple event subclass issued by the
+ * TickGenerator.
+ * &lt;p&gt;
+ * In the future, Ticks should include information about their
+ * frequency of occurance. This could be done by using different
+ * event names for each frequency, or using an event attribute.
+ */
+public class Tick
+    extends Event
+{
+
+    public static final String DEFAULT_EVENT_NAME = "Tick";
+
+    private static final String EVENT_SERVICE_HOME =
+        "com.bea.commerce.platform.events.EventServiceHome";
+
+    public Tick() {
+        this(DEFAULT_EVENT_NAME);
+    }
+
+    public Tick(String eventName) {
+        super(eventName);
+    }
+
+    protected EventServiceHome getEventServiceHome() {
+        try {
+        InitialContext context = new InitialContext();
+        Object ref = context.lookup(EVENT_SERVICE_HOME);
+        EventServiceHome home = (EventServiceHome)
+            PortableRemoteObject.narrow(ref, EventServiceHome.class);
+        return home;
+        }
+        catch (Exception e) {
+            e.printStackTrace();
+            return null;
+        }
+    }
+
+    public void issue() {
+        try {
+            // System.out.println("... issue tick event ...");
+
+            EventServiceHome home = getEventServiceHome();
+            if (home == null) return;
+            EventService service = home.create();
+            service.dispatchEvent(this);
+            }
+        catch (CreateException e) {
+            e.printStackTrace();
+        }
+        catch (RemoteException e) {
+            e.printStackTrace();
+        }
+        catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+}
+</code></pre>
+<p>&nbsp;</p>
+<p>A more complete implementation would provide multiple tick generators issuing 
+  events at different intervals. For example, hour ticks and daily ticks. This 
+  could be specified by sending parameters into the <code>TickManager</code> startup 
+  class that indicate how many tick generators to register and their frequency 
+  of ticking. The tick event could also include more information about what time 
+  it was triggered.. </p>
+<h4>Generating Email</h4>
+<p>A simple email generator would just wake up periodically, execute some query 
+  and use the Campaign Manager <code>MailService</code> interface to generate 
+  email. Although this solution can be implemented very quickly, it relies on 
+  the implemetation of the reminder processor to generate email. If a business 
+  engineer wanted to make changes to the email frequency or duration, Java code 
+  would need to be editted and redeployed. </p>
+<p>A more flexible approach is for the reminder processor that wakes up periodically 
+  to execute a query and issue events that a campaign manger can use for building 
+  scenario actions. For example, rather than writing a reminder processor that 
+  wakes up once a day, finds all the campaign visitors that have not visited the 
+  site in 30 days and sends an email, a reminder processor could be written that 
+  wakes up once a day and issues a reminder event for each campaign visitor that 
+  includes information about the visitor's days since registering and days since 
+  last visit. By issuing reminder events, a business engineer has the flexibility 
+  to write scenario actions that generate email at various intervals, e.g. on 
+  the day after registering and after 15 and 30 days of inactivity. If the business 
+  engineer determines that some other frequency is more appropriate, the only 
+  changes required are to the scenario actions defined in the E-Business Control 
+  Center.</p>
+<p>The event that a business engineer will use as a trigger for sending email 
+  messages will need to have sufficient attributes to build the necessary actions. 
+  Note: if the server will be hosting a number of concurrent campaigns, it may 
+  also be necessary to add a &quot;campaign&quot; attribute to the reminder event 
+  and a check put in the scenario trigger to guarantee that mail is only sent 
+  to people participating in the campaign that is generating the event.</p>
+<p>The first step is implementing a TickListener that listens for Tick events 
+  and invokes the reminder processor.</p>
+<p><b>TickListener.java</b></p>
+<pre><code>
+package com.bea.adc.reminder;
+
+import com.bea.commerce.platform.events.EventListener;
+import com.bea.commerce.platform.events.Event;
+import com.bea.adc.scheduler.Tick;
+
+/**
+ * TickListener
+ * &lt;p&gt;
+ * The TickListener wakes up periodically and invokes the
+ * ReminderProcessor to determine which ReminderEvents
+ * need to be thrown.
+ */
+public class TickListener
+    implements EventListener
+{
+    private static final String[] eventTypes = {
+        Tick.DEFAULT_EVENT_NAME
+    };
+
+    private ReminderProcessor processor = new ReminderProcessor();
+
+    public TickListener() {
+        // System.out.println("Creating TickListener");
+    }
+
+    public String[] getTypes() {
+        return eventTypes;
+    }
+
+    public void handleEvent( Event event ) {
+        processor.processReminders();
+    }
+}
+</code></pre>
+
+<p>The <code>TickListener</code> class is registered with the event system by 
+  adding it to the list of event handlers specified in the <code>weblogiccommerce.properties</code> 
+  file. (You may want to alter the interval value sent to the tick generator to 
+  a shorter value, like 5 minutes, for testing).</p>
+<p>Although the <code>ReminderProcessor</code>'s motivation for generating notification 
+  events is clear, the implementation is not. Unlike the tick events that were 
+  defined earlier, reminder events need to trigger campaign scenario actions. 
+  Campaign events require a number of fields to guarantee that the campaign rules 
+  will be triggered; specifically the user id, session id and the request. The 
+  challenge here is that the reminder processor is running on a thread that fielded 
+  the time ticking event. Since the process was not initiated from a web request, 
+  there is no <code>HTTPSession</code> or <code>HTTPRequest</code> to put in the 
+  event. The way around this is for the reminder processor to request a web page 
+  which logs the user in, creates a session and then fires an event.</p>
+<p>In the sample reminder processor, a database table of offers that the site 
+  has issued is searched. Reminder events are generated for all open offers. The 
+  commerce business engineer can define actions in the E-Business Control Center 
+  based on the lifetime of the open offers.</p>
+
+<p><b>ReminderProcessor.java</b></p>
+<pre><code>
+package com.bea.adc.reminder;
+
+import java.io.*;
+import java.net.*;
+import javax.naming.*;
+import java.sql.*;
+import javax.sql.DataSource;
+import java.util.Vector;
+import java.text.SimpleDateFormat;
+import com.beasys.commerce.axiom.util.helper.JNDIHelper;
+import com.bea.adc.offer.*;
+
+/**
+ * ReminderProcessor
+ * &lt;p&gt;
+ * ReminderProcessor examines offers and issues OfferReminderEvents.
+ * The current implementation queries the table of offers, and periodically
+ * issues OfferReminderEvents. Business Engineers can build rules to issue
+ * mail based on event attributes, such as time remaining.
+ */
+public class ReminderProcessor {
+
+    private static final SimpleDateFormat formatter =
+        new SimpleDateFormat("HH:mm:ss");
+
+    private static final String OFFER_HOME =
+        "Offer";
+
+    private static final String FIND_OFFERS_QUERY =
+        "select userid from offer " +
+        "where expiration_date > sysdate and accepted = 0";
+
+    public void processReminders() {
+        try {
+            String[] ids = findOpenOffersFromDatabase();
+
+            for (int i = 0; i < ids.length; i++) {
+
+                String userid = ids[i];
+
+                // get offer
+                OfferValueObject offer = null;
+                OfferHome offerHome = (OfferHome) JNDIHelper.getHome(OFFER_HOME);
+                OfferKey pk = new OfferKey();
+                pk.user = userid;
+                OfferRemote offerRef = offerHome.findByPrimaryKey(pk);
+                offer = offerRef.getOfferValue();
+
+                dispatchOffer(userid, offer);
+            }
+        }
+        catch (Exception e) {
+            // don't let any exceptions escape from here
+            e.printStackTrace();
+        }
+    }
+
+    /**
+     * Dispatch the offer by invoking a web request.
+     * That we way can log in as a user and have an HTTP request
+     * and session for the event.
+     */
+    protected void dispatchOffer(String userid, OfferValueObject offer) {
+
+        try {
+            String server = "http://localhost";
+            String page = "/testApp/reminder/generateReminderEvent.jsp";
+            URL url = new URL(server + page + "?userid=" + userid);
+            URLConnection conn = url.openConnection();
+            BufferedReader in = new BufferedReader(
+                new InputStreamReader(
+                    conn.getInputStream()));
+            String inputLine;
+            while ((inputLine = in.readLine()) != null) ;
+        }
+        catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    /**
+     * return the list of user ids with open, unexpired offers 
+     */
+    protected String[] findOpenOffersFromDatabase() {
+        // this code should be delegated to a offer session bean
+        // it's here to speed up demo development time.
+        Vector temp = new Vector();
+
+        java.sql.Connection conn = null;
+        Statement stmt = null;
+        ResultSet rs = null;
+
+        try {
+            conn = getConnection();
+            if (conn == null) return new String[0];
+
+            stmt = conn.createStatement();
+            rs = stmt.executeQuery(FIND_OFFERS_QUERY);
+
+            while (rs.next()) {
+                temp.addElement(rs.getString(1));
+            }
+        }
+        catch (SQLException e) {
+            e.printStackTrace();
+        }
+        finally {
+            try { rs.close(); } catch (SQLException se) {}
+            try { stmt.close(); } catch (SQLException se) {}
+            try { conn.close(); } catch (SQLException se) {}
+        }
+        String[] results = new String[temp.size()];
+        temp.copyInto(results);
+        return results;
+    }
+
+    protected java.sql.Connection getConnection()
+        throws SQLException
+    {
+        try {
+            Context ctx = new InitialContext();
+            DataSource ds = (DataSource)
+                ctx.lookup("weblogic.jdbc.jts.commercePool");
+            return ds.getConnection();
+        }
+        catch (NamingException ex) {
+            ex.printStackTrace();
+            return null;
+        }
+    }
+
+}
+</code></pre>
+
+<p><b>OfferReminderEvent.java</b></p>
+<pre><code>
+package com.bea.adc.reminder;
+
+import javax.ejb.CreateException;
+import java.rmi.RemoteException;
+import javax.rmi.PortableRemoteObject;
+import javax.naming.InitialContext;
+import javax.naming.NamingException;
+import com.bea.commerce.platform.events.Event;
+import com.bea.commerce.platform.events.EventService;
+import com.bea.commerce.platform.events.EventServiceHome;
+import com.bea.adc.offer.OfferValueObject;
+
+/**
+ * OfferReminderEvent
+ * &lt;p&gt;
+ * OfferReminderEvent events get emitted periodically
+ * for any offer that is unaccepted and not expired.
+ */
+public class OfferReminderEvent
+    extends Event
+{
+
+    public static final String REMINDER_EVENT_TYPE = "OfferReminderEvent";
+
+    public static final String CUST_ID_ATTRIBUTE = "customer_id";
+    public static final String OFFER_DATE_ATTRIBUTE = "offer_date";
+    public static final String EXP_DATE_ATTRIBUTE = "exp_date";
+    public static final String DAYS_REMAINING_ATTRIBUTE = "days_remaining";
+    public static final String OFFER_ATTRIBUTE = "offer_object";
+    public static final String CAMPAIGN_NAME = "campaign_name";
+
+    private static final String EVENT_SERVICE_HOME =
+        "com.bea.commerce.platform.events.EventServiceHome";
+
+    public OfferReminderEvent(OfferValueObject offer) {
+        super(REMINDER_EVENT_TYPE);
+        setAttribute(CUST_ID_ATTRIBUTE, offer.identifier);
+        setAttribute(OFFER_DATE_ATTRIBUTE, offer.offerDate);
+        setAttribute(EXP_DATE_ATTRIBUTE, offer.expirationDate);
+        setAttribute(DAYS_REMAINING_ATTRIBUTE, new Integer(offer.daysRemaining));
+        setAttribute(CAMPAIGN_NAME, offer.campaignName);
+        setAttribute(OFFER_ATTRIBUTE, offer);
+    }
+
+    private EventServiceHome getEventServiceHome() {
+        try {
+        InitialContext context = new InitialContext();
+        Object ref = context.lookup(EVENT_SERVICE_HOME);
+        EventServiceHome home = (EventServiceHome)
+            PortableRemoteObject.narrow(ref, EventServiceHome.class);
+        return home;
+        }
+        catch (Exception e) {
+            e.printStackTrace();
+            return null;
+        }
+    }
+
+    public void issue() {
+        try {
+
+        // System.out.println("... issue reminder event ...");
+        EventServiceHome home = getEventServiceHome();
+        if (home == null) return;
+        EventService service = home.create();
+        service.dispatchEvent(this);
+        }
+        catch (CreateException e) {
+            e.printStackTrace();
+        }
+        catch (RemoteException e) {
+            e.printStackTrace();
+        }
+        catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+}
+</code></pre>
+
+<p>Here's the JSP page that results in the reminder event being issued.</p>
+<p><b>generateReminderEvent.jsp</b></p>
+
+<pre><code>
+&lt;%@ page extends="com.beasys.commerce.axiom.p13n.jsp.P13NJspBase"%&gt;
+&lt;%@ page errorPage="error.jsp" %&gt;
+
+&lt;%@ page import="
+    com.bea.commerce.platform.events.Event,
+    com.bea.commerce.platform.events.EventService,
+    com.bea.commerce.platform.events.EventServiceHome,
+    com.beasys.commerce.axiom.contact.UserManagementConstants,
+    com.beasys.commerce.axiom.p13n.http.Request,
+    com.beasys.commerce.axiom.p13n.http.Session,
+    com.beasys.commerce.axiom.p13n.jsp.P13NJspHelper,
+    com.beasys.commerce.axiom.util.helper.JNDIHelper,
+    com.beasys.commerce.foundation.ConfigurableEntity,
+    com.beasys.commerce.foundation.flow.helper.FlowManagerHelper,
+    com.beasys.commerce.portal.admin.JspPages,
+    com.beasys.commerce.portal.ejb.PortalHelper,
+    com.beasys.commerce.portal.jspbeans.PortalAppearanceBean,
+    com.beasys.commerce.portal.Portal,
+    com.beasys.commerce.portal.tags.*,
+    com.beasys.commerce.user.jsp.tags.*,
+    weblogic.servlet.security.ServletAuthentication,
+    com.bea.adc.offer.*,
+    com.bea.adc.reminder.*
+"%&gt;
+
+&lt;%@ taglib uri="offer.tld" prefix="offer" %&gt;
+
+&lt;%! private static final boolean DEBUG = false; %&gt;
+
+&lt;%
+    /*
+     * JSP for issuing OfferReminderEvents.
+     */
+
+    String userid = request.getParameter("userid");
+    String password = "password";
+    String group = "wlcs_customer";
+
+    session = request.getSession( true );
+    if ( DEBUG ) System.out.println( "session.getId() = " + session.getId() );
+
+    // log in
+
+    setSessionValue(com.beasys.commerce.axiom.jsp.JspConstants.SERVICEMANAGER_USER, userid, request);
+    setUser(userid, request);
+    setSuccessor(group, request);
+    int authenticated = ServletAuthentication.weak( userid, password, request );
+    session.setAttribute( "UserStatus", "Returning" );
+
+    if ( DEBUG )
+    {
+        System.out.println( "ServletAuthentication = " + ( authenticated == ServletAuthentication.AUTHENTICATED ) );
+    }
+
+%&gt;
+
+&lt;offer:getOffer userId="&lt;%= userid %&gt;" id="offer" /&gt;
+
+&lt;%
+    if (DEBUG) {
+        System.out.println("generateReminderEvent: offer days remaining = " + offer.daysRemaining);
+        System.out.println("generateReminderEvent: offer campaign name = " + offer.campaignName);
+    }
+
+    OfferReminderEvent event = new OfferReminderEvent(offer);
+
+    event.setAttribute("user_id", userid);
+    Request p13nRequest = new Request( request, true );
+    event.setAttribute("request", p13nRequest);
+    event.setAttribute("session_id", session.getId());
+    event.issue();
+%&gt;
+&lt;!-- the actual content of the message is ignored. --&gt;
+&lt;html&gt;
+&lt;head&gt;&lt;title&gt;Remind &lt;%= userid %&gt;&lt;/title&gt;&lt;/head&gt;
+&lt;body&gt;&lt;h1&gt;User id =  &lt;%= userid %&gt;&lt;/h1&gt;&lt;/body&gt;
+&lt;/html&gt;
+</code></pre>
+
+<h4>Building Email Rules</h4>
+<p>Once the reminder processor and the generateReminder.jsp file are in place, 
+  the final step is to define the meta-data about the event in the E-Business 
+  Control Center and create scenario actions required by the business. </p>
+<p>Using the E-Business Control Center, add a new Event named OfferReminderEvent. 
+  Give the event the following properties:</p>
+
+<center>
+<table border="3">
+  <tr>
+      <td><b>Property</b></td>
+      <td><b>Data Type</b></td>
+      <td><b>Selection Mode</b></td>
+      <td><b>Value Range</b></td>
+  </tr>
+  <tr>
+    <td>user_id</td>
+    <td>Text</td>
+    <td>Single</td>
+    <td>Unrestricted</td>
+  </tr>
+  <tr>
+    <td>session_id</td>
+    <td>Text</td>
+    <td>Single</td>
+    <td>Unrestricted</td>
+  </tr>
+  <tr>
+    <td>campaign_name</td>
+    <td>Text</td>
+    <td>Single</td>
+    <td>Unrestricted</td>
+  </tr>
+  <tr>
+    <td>customer_id</td>
+    <td>Text</td>
+    <td>Single</td>
+    <td>Unrestricted</td>
+  </tr>
+  <tr>
+    <td>offer_date</td>
+    <td>Date/Time</td>
+    <td>Single</td>
+    <td>Unrestricted</td>
+  </tr>
+  <tr>
+    <td>exp_date</td>
+    <td>Date/Time</td>
+    <td>Single</td>
+    <td>Unrestricted</td>
+  </tr>
+  <tr>
+    <td>days_remaining</td>
+    <td>Numeric</td>
+    <td>Single</td>
+    <td>Unrestricted</td>
+  </tr>
+</table>
+</center>
+<p>&nbsp;</p>
+<p>Once the event fields have been defined, scenario actions can be written. Select 
+  the campaign and scenario to add the action to or create a new scenario. Select 
+  the &quot;New Action-&gt;Email Action&quot;.The action will trigger when &quot;An 
+  event has these properties&quot;. At this point, you are defining the rule for 
+  when to send mail. For example, you could select when an OfferReminderEvent 
+  arrives with the property &quot;days_remaining&quot; equals 2. If multiple campaigns 
+  are running concurrently, it may be necessary to add a clause to the rule matching 
+  the current campaign name.For the action, you specify the server url of the 
+  email message, the subject and the sender's email address. That's it. From that 
+  point on, email rules can be updated in the E-Business Control Center and mail 
+  messages will be generated as necessary.</p>
+<h4>Review</h4>
+<p>Here's the checklist of tasks required to build the flexible email framework:</p>
+<ol>
+  <li>Implement <code>Tick</code> event class</li>
+  <li>Implement <code>TickGenerator</code> (periodically issues tick events)</li>
+  <li>Implement <code>TickManager</code> (registers <code>TickGenerator</code>)</li>
+  <li>Register <code>TickManager</code> as a startup class in the WebLogic console.</li>
+  <li>Implement <code>OfferReminderEvent</code> (encapsulates data about a potential 
+    reminder)</li>
+  <li>Implement <code>event-generator.jsp</code> (creates and issues reminder 
+    event)</li>
+  <li>Implement <code>ReminderProcessor</code> (issue query and request jsp)</li>
+  <li>Implement <code>TickListener</code> (invoke <code>ReminderProcessor</code>)</li>
+  <li>Register <code>TickListener</code> as an event listener in <code>weblogiccommerce.properties</code>.</li>
+  <li>Define event information in the E-Business Control Center</li>
+  <li>Create scenario actions triggered by reminder events in the E-Business Control 
+    Center </li>
+</ol>
+<p></p>
+<p></p>
+<p></p>
+<p></p>
+<h4> Summary</h4>
+<p>The Campaign Manager for WebLogic provides a flexible framework for building 
+  internet-based e-commerce campaigns. With some careful business analysis, campaign 
+  events can be defined that allow commerce business engineers the flexibility 
+  to generate email messages for a variety of situations, including visitor inactivity 
+  or other non-browsing events.</p>
+</body>
+</html>

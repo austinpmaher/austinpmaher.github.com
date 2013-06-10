@@ -1,0 +1,221 @@
+/*
+ * This style sheet presents content primarily in grey-scale, with 
+ * hints of color when hovering.
+ */
+body { 
+    /* I'm having second thoughts on the colored text - esp re: scrolling */
+    /* color: #666666; */
+    background-color: white; 
+    margin-top: 24pt;
+    margin-left: 72pt;
+    margin-right: 72pt;
+    margin-bottom: 24pt; 
+    font-size: 9pt;
+    font-family: "Lucida Grande", Tahoma, Arial, sans-serif;
+}
+
+.content { 
+    /* color: #666666; */
+    background-color: white; 
+    margin-top: 24pt;
+    margin-left: 5pt;
+    margin-right: 5pt;
+    margin-bottom: 24pt; 
+    font-size: 9pt;
+    font-family: "Lucida Grande", Tahoma, Arial, sans-serif;
+}
+
+.cite {
+    background-color: white; 
+    margin-top: 24pt;
+    margin-left: 15pt;
+    margin-right: 15pt;
+    margin-bottom: 24pt; 
+    font-size: 9pt;
+    font-family: "Lucida Grande", Tahoma, Arial, sans-serif;
+}
+
+/*
+ * The headers and other major navigational elements are actually 
+ * navy blue.
+ */
+h1 {
+    color: #333366;
+    font-family: "Lucida Grande", Tahoma, Arial, sans-serif;
+    font-weight: bolder;
+    font-size: 16pt;
+}
+
+h1.title {
+    margin-top: 4pt;
+    margin-bottom: 15pt;
+}
+
+
+h2 {
+    color: #333366;
+    background-color: white;
+    font-family: "Lucida Grande", Tahoma, Arial, sans-serif;
+    font-weight: bolder;
+    font-size: 13pt;
+    margin-bottom: 0pt;
+}
+
+h3 {
+    color: #333366;
+    font-family: "Lucida Grande", Tahoma, Arial, sans-serif;
+    font-weight: bolder;
+    font-size: 11pt;
+    margin-bottom: 0pt;
+}
+
+
+
+.navigation {
+    width="100%";
+    color: white;
+    background-color: #333366;
+    font-size: 8pt;
+    padding: 10px;
+    margin-bottom: 0pt;
+    margin-top: 10pt;
+}
+
+/*
+ * The navigation links should appear the same, whether they have been visited or not.
+ */
+.navigation a, .navigation a:visited {
+    color: white;
+    background-color: #333366;
+    text-decoration: none;
+}
+
+
+.navigation a:hover {
+    color: #ff6600; 
+    background-color: #333366;
+    text-decoration: none;
+}
+
+
+.subnavigation {
+    color: #333366;
+    background-color: white;
+    font-size: 8pt;
+    padding: 10px;
+    margin-bottom: 0pt;
+    margin-top: 23pt;
+    float: right; 
+}
+
+/*
+ * The navigation links should appear the same, whether they have been visited or not.
+ */
+.subnavigation a, .subnavigation a:visited {
+    color: #333366; 
+    text-decoration: none;
+}
+
+.subnavigation a:hover {
+    color: #ff6600; 
+    text-decoration: none;
+}
+
+.copyright {
+    width="100%";
+    color: white;
+    background-color: #333366;
+    font-family: "Lucida Grande", helvetica, arial, sans-serif;
+    font-size: 8pt;
+    padding: 10px;
+    margin-bottom: 36pt;
+    margin-top: 0pt;	
+}
+
+.copyright a, .copyright a:visited {
+    color: white;
+    background-color: #333366;
+    text-decoration: none;
+}
+
+.copyright a:hover {
+    color: #ff6600; 
+    background-color: #333366;
+    text-decoration: none;
+}
+
+a {
+    color: #666666;
+    background-color: white;
+    text-decoration: underline;
+}
+
+a:hover {
+    background-color: white;
+    /* font-weight: bold; */
+    color: #FF9933;
+    text-decoration: none;
+}
+
+a:visited {
+    background-color: white;
+    color: #FF9933;
+    text-decoration: underline;
+}
+
+p {
+    margin-top: 0pt;
+    text-align: justify;
+}
+
+
+/*
+ * other settings
+ */
+img {
+    border: 0;
+}
+
+.links {
+     font-family: Verdana, Arial, sans-serif;
+     color: black;
+     font-size: 11px;
+     padding-left: 10px; padding-right: 10px;
+}
+
+#banner {
+     font-family:verdana, arial, sans-serif;
+     color:#FFF;
+     font-size:20px;
+     font-weight:normal;
+     border-bottom:1px dotted #FFF;
+     border-top:3px solid #99CCFF;
+     background:#336699;
+     padding:15px; 
+     text-transform:uppercase;
+     letter-spacing: .2em; 		
+}
+
+.description {
+     font-family:verdana, arial, sans-serif;
+     color:#99CCFF;
+     font-size:12px;
+     font-weight:bold;
+     background:#336699;	
+     text-transform:none;	
+     letter-spacing: .none; 		
+}	
+				
+#content {
+    float:left;
+    width:65%;
+    background:#fff;
+    border-right:1px dotted #999;
+    margin-right:15px;
+    padding-bottom:20px;
+}
+
+#links {
+    background:#fff;
+    padding-right:15px;				
+}

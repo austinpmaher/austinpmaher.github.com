@@ -1,0 +1,468 @@
+<HTML>
+<HEAD>
+   <META HTTP-EQUIV="Content-Type" CONTENT="text/html; charset=iso-8859-1">
+   <META NAME="Generator" CONTENT="Microsoft Word 97">
+   <META NAME="Template" CONTENT="C:\msoffice\Templates\APM-DOC.DOT">
+   <META NAME="GENERATOR" CONTENT="Mozilla/4.05 [en]C-DIAL  (Win95; I) [Netscape]">
+   <TITLE>Owl Compiler Notes</TITLE>
+</HEAD>
+<BODY>
+<B><FONT FACE="Arial"><FONT SIZE=+1>Owl Notes
+-- 1 Michael Kilian</FONT></FONT></B>
+
+<P><I><FONT FACE="Bookman Old Style"><FONT SIZE=-1>This is the first in
+a series of notes I plan to release on the Owl compiler and the revisions
+it is going through. I am writing these notes not just to show how the
+Owl compiler works on the inside, but also how you can apply object oriented
+programming even without an object oriented language like Owl.</FONT></FONT></I>
+
+<P><B><FONT FACE="Arial">Object Oriented Nomenclature</FONT></B>
+
+<P><FONT FACE="Bookman Old Style"><FONT SIZE=-1>There are a lot of terms
+used in Object Oriented Programming. With the advent of Smalltalk (which
+seems to rename every conventional notion) there are have been a lot of
+terms thrown around. The following is a list of terms, some of general
+use, some particular to the implementation of Owl. It is by no means complete.</FONT></FONT>
+<UL>
+<LI>
+<FONT FACE="Bookman Old Style"><FONT SIZE=-1>Object -- This is the center
+of attention. An Object is a collection of data surrounded by a set of
+routines which manipulate that data. The only way the object is modified
+is through the routines associated with it. In Owl, Objects have a specific
+type. Type_Modules (another Owl term) contain Operations which work on
+objects associated with that type module (having that type). See the definitions
+of Type Module, Operation, Component and Fixed Name below for a more complete
+description.</FONT></FONT></LI>
+</UL>
+
+<UL>
+<LI>
+<FONT FACE="Bookman Old Style"><FONT SIZE=-1>Hierarchy, Inheritance --
+Two more fundamental terms in Object Oriented Programming. Types are often
+arranged in hierarchies. This allows inheritance of operations, the process
+by which operations belonging to one type are assumed by another object.
+In Smalltalk, a type (called ''class'' by Smalltalk people) may only have
+one parent class (though the parent may have many children classes). This
+is single inheritance and it forms a tree. In Owl, there is multiple inheritance
+where a number of types (our term for class) may be the parents of a type
+(i.e., a graph instead of a tree). In either case, all of the operations
+contained in the parents are inherited by the children. The children may
+add further operations to themselves and pass these augmented sets of operations
+down to their children.</FONT></FONT></LI>
+</UL>
+
+<DIR>
+<DIR><FONT FACE="Bookman Old Style"><FONT SIZE=-1>This allows easy sharing
+of common code. For example, there might be a generic stack type with several
+children, for example, stack of integers, stack of operators, stack of
+characters, etc. The stack type can provide the basic push and pop operations,
+and the specific stacks can inherit these and add other routines for their
+particular purposes.</FONT></FONT></DIR>
+</DIR>
+
+<UL>
+<LI>
+<FONT FACE="Bookman Old Style"><FONT SIZE=-1>Type and Subtype -- In Owl,
+the basic hierarchy is expressed in terms of types and sub-types. A sub-type
+is simply a type which inherits from another type. All types are sub-types
+of at least the Object type. The Object type (also present in Smalltalk)
+is the root of all types and is the only type without a supertype. In Owl,
+type and subtype have the relationship that if an object of one type can
+be passed to an operation, an object of the subtype can also be passed
+to the operation.</FONT></FONT></LI>
+</UL>
+
+<UL>
+<LI>
+<FONT FACE="Bookman Old Style"><FONT SIZE=-1>Strong Typing -- Strong typing
+is where every argument to an operation and every expression must obey
+certain type rules. This includes making sure that every parameter to every
+routine is consistent with a specified type. Pascal is a strongly typed
+language. C and Smalltalk are not. Owl is a strongly typed language which
+makes it unique among object oriented languages which rely somewhat on
+the lack of type information for their execution. Languages which are strongly
+typed are also called type safe since certain programming errors can be
+recognized and avoided by catching all type inconsistencies at compile
+time. Because it is strongly typed, Owl can guarantee that there will be
+an appropriate operation for every invocation in the language.</FONT></FONT></LI>
+</UL>
+
+<UL>
+<LI>
+<FONT FACE="Bookman Old Style"><FONT SIZE=-1>Parameterized Type -- To make
+types more flexible, it is often desirable to allow them to have a parameter.
+For example, a type specifying a list is not terribly useful if it can
+only be a list of one type of thing. A list is also not very type-safe
+if it can accept any object (i.e., a list of type Object). One solution
+is to have a list of type P, where P can be filled in later (denoted by
+List(P)). P is said to be a parameter to the type. It is then possible
+to have a type List(Integer) where Integer replaces P everywhere in the
+type specification (e.g., pop may return a type P which is then replaced
+with Integer).</FONT></FONT></LI>
+</UL>
+
+<CENTER><FONT FACE="Bookman Old Style"><FONT SIZE=-1>Owl Specific Nomenclature</FONT></FONT></CENTER>
+
+<CENTER></CENTER>
+
+<CENTER><FONT FACE="Bookman Old Style"><FONT SIZE=-1>(For more information,
+see the Owl Reference Manual)</FONT></FONT></CENTER>
+
+<UL>
+<LI>
+<FONT FACE="Bookman Old Style"><FONT SIZE=-1>Workspace -- The workspace
+is the entire contents of the Owl environment. It contains the compiler,
+the compiler data structures and the compiled Owl type modules. Due to
+the large amount of information included in the workspaces, they tend to
+be very large (around 10 Megabyte).</FONT></FONT></LI>
+</UL>
+
+<UL>
+<LI>
+<FONT FACE="Bookman Old Style"><FONT SIZE=-1>Type Module -- A type module
+specifies a type including what fields it contains, the operations on those
+fields and the relationship of the type in the hierarchy.</FONT></FONT></LI>
+</UL>
+
+<UL>
+<LI>
+<FONT FACE="Bookman Old Style"><FONT SIZE=-1>Operation -- An operation
+accepts an object which is the same type as the type module the operation
+resides in and performs some action on that object. Occasionally, operations
+accept not an object of a specific type, but the type itself. An example
+of this is the Create operation which creates an object of a specific type.</FONT></FONT></LI>
+</UL>
+
+<UL>
+<LI>
+<FONT FACE="Bookman Old Style"><FONT SIZE=-1>Fixed Name -- This would be
+considered a constant in most other languages. However, a very complicated
+expression can be assigned as the value of a fixed name. This expression
+would be evaluated once and serve as the constant value for the rest of
+the program's execution.</FONT></FONT></LI>
+</UL>
+
+<UL>
+<LI>
+<FONT FACE="Bookman Old Style"><FONT SIZE=-1>Component -- Often a programmer
+simply wants to have a piece of data read or written, perhaps with some
+filtering. A specialized notation has been introduced for these types of
+operations. Components are really shorthand for two operations, GET and
+PUT on that data. The shorthand also allows a record like notation for
+accessing components, e.g., ME.foo means to extract the foo component from
+the object ME.</FONT></FONT></LI>
+</UL>
+
+
+<P><B><FONT FACE="Arial"><FONT SIZE=+1>Owl Notes -- 2 Michael Kilian</FONT></FONT></B>
+
+<P><I><FONT FACE="Bookman Old Style"><FONT SIZE=-1>This is the second note
+in a set of notes on object oriented programming and the Owl Compiler.
+It describes some basic ideas which are being used to implement an incremental
+compiler for Owl and shows an example of how to use object oriented programming
+with a non-object-oriented language.</FONT></FONT></I>
+
+<P><B><FONT FACE="Arial">Owl Compiler Methodology</FONT></B>
+
+<P><FONT FACE="Bookman Old Style"><FONT SIZE=-1>As with most programming
+languages, Owl allows programs to be broken down into smaller units of
+code. The primary units of a program are:</FONT></FONT>
+<OL>
+<LI>
+<FONT FACE="Bookman Old Style"><FONT SIZE=-1>Workspace -- The entire body
+of code and results from the execution of that code. It also includes the
+symbol tables and other information which the compiler collects.</FONT></FONT></LI>
+
+<LI>
+<FONT FACE="Bookman Old Style"><FONT SIZE=-1>Type Module -- All code is
+a member of one type module or another. Notice that the type module does
+not contribute any code itself; it provides a context for the operations,
+components and fixed names within it.</FONT></FONT></LI>
+
+<LI>
+<FONT FACE="Bookman Old Style"><FONT SIZE=-1>Operation -- This is really
+the major concern of the compiler. Owl matches invocations to operation
+definitions through the type information it has. The compiler also propagates
+operations down the hierarchy.</FONT></FONT></LI>
+
+<BR>&nbsp;</OL>
+<FONT FACE="Bookman Old Style"><FONT SIZE=-1>The Owl compiler under development
+will treat Workspaces, Type Modules and Operations as types. There are
+a (large) set of operations which manipulate objects of these data types.
+For example, there is an operation ws_add_type_module(ws,tm) which inserts
+the type module (tm) into workspace ws. While this seems natural, it is
+not the typical method of compilation (typical compilers are organized
+in compilation passes).</FONT></FONT>
+
+<P><FONT FACE="Bookman Old Style"><FONT SIZE=-1>Unfortunately, compilation
+passes do not often lend themselves to incremental compilation. In incremental
+compilation, a small part of the program is compiled and then combined
+with other parts of the program that were previously compiled. In a strongly
+typed language, this problem is compounded by requiring that separately
+compiled modules type-check. This means that a routine which calls another
+routine in a previously compiled module must still have all of its arguments
+checked for consistency.</FONT></FONT>
+
+<P><FONT FACE="Bookman Old Style"><FONT SIZE=-1>In the compiler under development,
+the emphasis is on incremental compilation. It quickly becomes obvious
+that the standard idea of compilation passes doesn't function very well
+in an environment where there exist data structures in a variety of states.
+For example, you may be adding an operation to a pre-existing type module.
+In a language such as BLISS, you might only need to compile the operation
+and link it in. In Owl, there are many more issues to face. The added operation
+may supercede a previously inherited one in that type module. It may also
+conflict in a subtype as it is inherited down the hierarchy. To attack
+this problem, we are viewing the workspace as a database with operations
+to manipulate definitions in type modules.</FONT></FONT>
+
+<P><FONT FACE="Bookman Old Style"><FONT SIZE=-1>Object oriented techniques
+do not make the problem any simpler in terms of possible conflicts and
+special cases. However, they do make it easier to get to a solution which
+is fairly clean and easy to talk about. In the above example, you can devise
+several operations on type modules which make the problem more manageable.
+The first activity is: Add-Operation-to-Type-Module. This is the top level
+operation. It may be made up of Add-Operation-to-Only-This-Type-Module
+(i.e., don't worry about inheritance). This operation may notice that an
+operation already exists which needs to be removed from the type module
+(it was inherited and is now superceded). It may then call Delete-Operation-from-Type-Module
+which has a set of operations under it. Another part of addition may be
+Inherit-this-operation-into-that-Type-Module. This would take care of making
+the operation added in a supertype known to subtypes.</FONT></FONT>
+
+<P><FONT FACE="Bookman Old Style"><FONT SIZE=-1>The solution looks a little
+more reasonable now. The idea of operations working on a type module data
+type gives us a framework for developing the code needed to make the solution
+work. It also makes it easy to pinpoint what operations should be global
+and what should remain private to a module (Owl uses the terms Public and
+Private). This makes the interface to the data type easily and exactly
+defined so that people adding features to the compiler need not learn the
+messy details of the compiler.</FONT></FONT>
+
+<P><FONT FACE="Bookman Old Style"><FONT SIZE=-1>Another benefit of this
+design methodology is that information hiding becomes natural. In the operation
+addition example, it may be necessary to check that the specification of
+an operation match some other specification. If one specification is ''old''
+(i.e., has already been compiled) and the other one is ''new'' (being compiled),
+certain calculations may need to be performed on the new one to make it
+analyzable. This difference need only be visible to the routines analyzing
+the operation object. It can look at the state of the object and, if it
+is new, do the calculations necessary to allow the analysis to go on. No
+one else need know about the difference so that it is natural to say:</FONT></FONT>
+
+<P><FONT FACE="Bookman Old Style"><FONT SIZE=-1>IF analyze_specification(.new)
+EQL analyze_specification(.old) THEN ...</FONT></FONT>
+
+<P><FONT FACE="Bookman Old Style"><FONT SIZE=-1>The analyze_specification
+routine may even cache its analysis somewhere in the operation object to
+make retrieval quicker in the future. Again, this fact is completely hidden
+from the rest of the routines, making code easier to understand and less
+''special case-y.''</FONT></FONT>
+
+<P><FONT FACE="Bookman Old Style"><FONT SIZE=-1>You may notice that this
+example sounds very much like top-down programming. It is. But the emphasis
+is in top-down developing a set of routines which manipulate an object.
+Once this is done, principles of inheritance can be used to determine what
+code can be shared and what types of modifications are needed for code
+that can't be directly shared. The compiler treats components like a subtype
+of operation. Components add information to two operations; this is a common
+occurrence in a hierarchy of types. Components can therefore use most of
+the routines associated with operations with a few additional ones and
+a few modifications. Operations, Components and Fixed Names can all be
+considered subtypes of another type called definition. They therefore inherit
+common routines for inserting a definition into a type module.</FONT></FONT>
+
+<P><FONT FACE="Bookman Old Style"><FONT SIZE=-1>These techniques do not
+require an object oriented language to be implemented. The Owl Compiler
+is being developed in BLISS, which is about as far from object oriented
+as you can get. However, by using the object oriented methodology, the
+design of modules becomes simpler and the re-use of code easier to determine.</FONT></FONT>
+
+<P><B><FONT FACE="Arial"><FONT SIZE=+1>Owl Notes -- 3 Michael Kilian</FONT></FONT></B>
+
+<P><I><FONT FACE="Bookman Old Style"><FONT SIZE=-1>This is the third note
+in a set of notes on object oriented programming and the Owl Compiler.
+It describes how inheritance is managed in a strongly typed object oriented
+language with multiple inheritance.</FONT></FONT></I>
+
+<P><B><FONT FACE="Arial">Owl Inheritance Techniques</FONT></B>
+
+<P><FONT FACE="Bookman Old Style"><FONT SIZE=-1>Owl has some unique problems
+due to the requirement that all operations and operation invocations type
+check. In a language like Smalltalk, operation invocations are not checked
+at all. In fact, the actual lookup of an operation occurs at run time where
+the class of an object (the ''receiver'' object) determines how the ''selector''
+(the operation identification) is to be interpreted (i.e., what the ''message''
+is). This is Smalltalk-ese for saying that the type of an object determines
+which operation will be invoked. For example, you may have two types, integer
+and graphic-object, both with the operation PLUS on them. The type of the
+object being added to determines which PLUS to use.</FONT></FONT>
+
+<P><FONT FACE="Bookman Old Style"><FONT SIZE=-1>Owl is different. Every
+object in Owl has a type and when an object is used as an argument to an
+operation, this type must match the declared types of the formal parameters.
+The first argument to an operation corresponds to Smalltalk's idea of a
+receiver. Since the type of the receiver largely determines what specific
+version of the operation to use, much of the search that Smalltalk encounters
+is eliminated. However, inheritance becomes more complicated. In Smalltalk,
+inheritance is straightforward. You look at the current class and see if
+the operation exists there. If not, you look at the next supertype. This
+goes on until you find the appropriate operation.</FONT></FONT>
+
+<P><FONT FACE="Bookman Old Style"><FONT SIZE=-1>Because of the type information,
+and because of other language constructs (e.g., fixed names of type TYPE),
+Owl cannot keep just one instance of an operation around. There is no tracing
+upwards for finding an operation. Instead, operations are copied into each
+type module so that each type has its own copy of an inherited operation.
+Therefore, if some type has ten operations, then all of its subtypes will
+also have copies of these ten operations, as will the subtypes of those
+subtypes.</FONT></FONT>
+
+<P><FONT FACE="Bookman Old Style"><FONT SIZE=-1>This last point needs to
+be explained a little more. In Smalltalk, an operation which is inherited
+down the hierarchy only exists where it was originally entered. In Owl,
+it exists wherever it is inherited. This allows not only the ''sharing''
+of code, but also the ability to make small changes to the specification
+of the operation without having to re-implement the operation. For example,
+Owl supports the ability to hide certain operations (we call them ''private''
+operations). It is possible to inherit a visible operation and convert
+it to a private one. This effectively stops the inheritance of that operation
+down the hierarchy.</FONT></FONT>
+
+<P><FONT FACE="Bookman Old Style"><FONT SIZE=-1>Owl also supports multiple
+inheritance. This is where a type may have more than one supertype. This
+is not the case with Smalltalk since it would make its search path to find
+an operation too expensive. By copying the operations down the hierarchy
+tree from all the supertypes to all of the subtypes, you are assured of
+having all of the operations for a specific type at one location, inside
+the type module, making the search trivial.</FONT></FONT>
+
+<P><FONT FACE="Bookman Old Style"><FONT SIZE=-1>There are other reasons
+for implementing inheritance by ''copying down.'' The actual types of arguments
+may change as the operation is passed down. For example, suppose a formal
+parameter of an operation had the type FO0, where FO0 was actually a defined
+constant of type TYPE which was initialized to Integer. Further down in
+the hierarchy, FOO may be redefined to be of type String. The inherited
+version of the operation therefore changes (its third argument has a different
+type). By having copied down versions of the operation, the type change
+is easy to manage by just changing the type in the copies of the operation
+affected.</FONT></FONT>
+
+<P><FONT FACE="Bookman Old Style"><FONT SIZE=-1>Of course, this approach
+is not without its penalties. As you may well imagine, in a large Owl program
+with many levels in the hierarchy (the Owl environment, Trellis, for example)
+you pay a price for having all of those copies of operations. Trellis occupies
+over 10 Megabytes as a compiled image, and contains over 10,000 operations,
+most of them inherited copies. Of these 10,000 operations, less than 3000
+are ever used. This means that nearly three quarters of the operations
+in the workspace are dead weight. This is one of the most pressing problems
+facing Owl: How to make the workspace sizes shrink. Some of the issues
+surrounding this and solutions being worked on will be in the next note.</FONT></FONT>
+
+<P><B><FONT FACE="Arial"><FONT SIZE=+1>Owl Notes -- 4 Michael Kilian</FONT></FONT></B>
+
+<P><I><FONT FACE="Bookman Old Style"><FONT SIZE=-1>This is the fourth and
+final note in a set of notes on object oriented programming and the Owl
+Compiler. It describes some of the problems with the current scheme and
+approaches to these problems. Note number three should be read before reading
+this one.</FONT></FONT></I>
+
+<P><B><FONT FACE="Arial">Owl Compiler Hurdles</FONT></B>
+
+<P><FONT FACE="Bookman Old Style"><FONT SIZE=-1>The main problem with the
+trellis system is its size. Note that all of the code generated and all
+of the data structures created by the compiler are stored in a single heap.
+A workspace is nothing more than the image of that heap, i.e., virtual
+memory. Because so much information is stored in the heap, the virtual
+address space can become very large. For example, the Trellis environment,
+written in Owl consumes on the order of 15 Megabytes of space.</FONT></FONT>
+
+<P><FONT FACE="Bookman Old Style"><FONT SIZE=-1>There are several reasons
+for this large size. The first is the way inheritance is done. As was pointed
+out in note 3, every type module has a copy of all of the operations which
+may be inherited into that type module whether they are used or not. By
+the time you get several levels deep in the inheritance or inherit from
+several parents, there is a plethora of operation data structures in the
+type module.</FONT></FONT>
+
+<P><FONT FACE="Bookman Old Style"><FONT SIZE=-1>Second, there is a lot
+of information kept around that most compilers would either throw away
+or put into files. A good example of this is cross-reference information.
+Attached to every operation data structure is a list of all of the operations
+in the system which use this operation&middot; Every type module contains
+lists describing all of its supertypes as well as the immediate subtypes.
+While this may seem wasteful, it does allow the Trellis environment to
+quickly tell you information which is useful in programming in Owl.</FONT></FONT>
+
+<P><FONT FACE="Bookman Old Style"><FONT SIZE=-1>It is obvious that the
+majority of the heap is not taken up by code but by compiler data structures.
+How do we modify the system to get rid of all of these data structures?
+Here are two tactics:</FONT></FONT>
+<BLOCKQUOTE>
+<LI VALUE="1">
+<FONT FACE="Bookman Old Style"><FONT SIZE=-1>Put these data structures
+off-line. This means that we get them out of the heap (virtual address
+space) and place them into a file of some sort. Note that this discussion
+does not worry about fitting Owl onto a small disk. We simply don't want
+to use up all of VMS' virtual address space with structures which are only
+occasionally used.</FONT></FONT></LI>
+
+<LI>
+<FONT FACE="Bookman Old Style"><FONT SIZE=-1>Eliminate the data structures&middot;
+While this at first seems to contradict the argument that the information
+stored is very valuable, some other observations need to be made. In the
+Trellis environment, only a third of the operations in the heap are actually
+referenced&middot; This is because we inherit many operations, few of which
+are actually used (inheritance is not by demand)&middot; If these unused
+operations (i.e., the data structures corresponding to the unused operations)
+could be eliminated from the heap, then the resulting heap would be on
+the order of 50% smaller.</FONT></FONT></LI>
+</BLOCKQUOTE>
+<FONT FACE="Bookman Old Style"><FONT SIZE=-1>Obviously a combination of
+these two techniques is necessary.</FONT></FONT>
+
+<P><FONT FACE="Bookman Old Style"><FONT SIZE=-1>The approach being taken
+now is to begin making the access to the data structures more limited.
+In fact, all accesses to the data structures will be done by manipulating
+a 'descriptor' before actually touching the data structures. What is a
+descriptor? A descriptor is nothing more than an indirect pointer to a
+type module's or operation's data structure. It may have more information
+included with it than that, but by and large it serves as a place holder
+for a (larger) data structure.</FONT></FONT>
+
+<P><FONT FACE="Bookman Old Style"><FONT SIZE=-1>What does this gain us?
+It makes the off-lining problem a little simpler. We can now off-line the
+larger object being pointed to by the place holder. A flag in the place
+holder is set so that access to these objects requires first getting them
+from the offline source. This scheme only makes sense if the place holders
+are substantially smaller than the main data structures they prefix. It
+also requires that the ration of descriptors to data objects be relatively
+small (1 is ideal, less than 1 would imply that you had garbage in your
+offline data).</FONT></FONT>
+
+<P><FONT FACE="Bookman Old Style"><FONT SIZE=-1>The second approach being
+considered for a later revision of the compiler is to perform inheritance
+a little differently. Instead of automatically copying all of the inherited
+operations down, they should be inherited only upon demand. This means
+that we go through the operations which are entered "by hand" and whenever
+they require that an operation be copied down, it is.</FONT></FONT>
+
+<P><FONT FACE="Bookman Old Style"><FONT SIZE=-1>This does not mean that
+we can stop at that. The definition of the language requires that any operation
+which POTENTIALLY could be copied down must be type checked. Since symbols
+can change in new contexts, this requires new nodes. What is proposed is
+that after doing the on-demand part, a second pass is made for all of the
+operations which were not copied down on demand but which could be copied
+down in the future. The operations would be copied down, checked and then
+thrown away. This means that the heap does not grow any larger than the
+size of the largest definition copied down.</FONT></FONT>
+
+<P><FONT FACE="Bookman Old Style"><FONT SIZE=-1>If operations each have
+a descriptor, it is possible that the descriptors would be kept around
+and a flag would be set saying that the operation was OK, but unused and
+therefore, thrown away.</FONT></FONT>
+
+<P><FONT FACE="Bookman Old Style"><FONT SIZE=-1>While this last technique
+has some problems, it also has potential of greatly reducing the size of
+the workspace.</FONT></FONT>
+</BODY>
+</HTML>
