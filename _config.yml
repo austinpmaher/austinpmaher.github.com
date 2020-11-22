@@ -14,7 +14,6 @@ timezone:    America/New_York
 future:      true
 show_drafts: nil
 limit_posts: 0
-pygments:    true
 
 permalink:     date
 paginate_path: 'page:num'
@@ -30,10 +29,4 @@ port:        4000
 baseurl:     /
 url:         http://localhost:4000
 lsi:         false
-
-rdiscount:
-  extensions: []
-
-redcarpet:
-  extensions: []
 
