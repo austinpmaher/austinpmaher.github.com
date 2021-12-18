@@ -1,0 +1,26 @@
+---
+title: Recent reading
+layout: default
+---
+<div id="container" class="archives">
+  <div class="index">
+
+    {% capture years %}
+      {% for file in site.data.books %}
+        {{ file[0] }}
+      {% endfor %}
+    {% endcapture %}
+    {% assign sortedyears = years | split:' ' | sort | reverse %}
+
+    {% for year in sortedyears %}
+      <h2>{{ year }}<h2>
+        <ul>
+         {% for book in site.data.books[year] %}
+         <li>
+           <span class="title">{{ book.title }}</span>
+         </li>
+        {% endfor %}
+      </ul>
+    {% endfor %}
+  </div> <!-- /.index -->
+</div> <!-- /#container.archives -->
