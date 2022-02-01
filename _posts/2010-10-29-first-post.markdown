@@ -2,7 +2,7 @@
 layout: default
 title: Getting Started With Jekyll
 categories:
-  - colophon
+  - weblog
 
 ---
 
